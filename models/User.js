@@ -7,7 +7,8 @@ const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   address: { type: String, required: true }, // Single address field
-  date: { type: Date, default: Date.now }
+  date: { type: Date, default: Date.now },
+  cart: [{ type: mongoose.Schema.Types.ObjectId, ref: "Cart"}],
 });
 
 // Password encryption before saving

@@ -1,10 +1,9 @@
 const express = require('express');
-const { createOrder, paymentSuccess, paymentCancel } = require('../controllers/orderController');
-const auth = require('../middlewares/auth');
 const router = express.Router();
+const orderController = require('../controllers/orderController');
 
-router.post('/', auth, createOrder);
-router.get('/success', auth, paymentSuccess);
-router.get('/cancel', auth, paymentCancel);
+// Define routes
+router.post('/', orderController.createOrder); // Ensure this function exists
+router.get('/user/:userId', orderController.getOrdersByUser); // Ensure this function exists
 
 module.exports = router;

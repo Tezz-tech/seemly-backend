@@ -1,81 +1,53 @@
 const Order = require('../models/Order');
-const Cart = require('../models/Cart');
-const paypal = require('paypal-rest-sdk');
 
-// Create order
 exports.createOrder = async (req, res) => {
-  const { address } = req.body;
-
   try {
-    const cart = await Cart.findOne({ user: req.user.id }).populate('products.product');
-    if (!cart) return res.status(404).json({ msg: 'Cart not found' });
+    const { user, address, cart, paymentReference } = req.body;
 
-    const newOrder = new Order({
-      user: req.user.id,
-      products: cart.products,
-      totalPrice: cart.totalPrice,
-      address
-    });
+    // Validate request data
+    if (!user || !address || !cart || !paymentReference) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
 
-    await newOrder.save();
-
-    // Create PayPal payment
-    const payment = {
-      intent: 'sale',
-      payer: {
-        payment_method: 'paypal'
+    // Prepare order details
+    const orderDetails = {
+      user: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
       },
-      redirect_urls: {
-        return_url: 'http://localhost:5000/api/order/success', // Redirect URL after payment success
-        cancel_url: 'http://localhost:5000/api/order/cancel' // Redirect URL if payment is canceled
-      },
-      transactions: [{
-        amount: {
-          total: cart.totalPrice,
-          currency: 'USD'
-        },
-        description: 'Order from e-commerce site'
-      }]
+      products: cart.map(item => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        totalPrice: item.totalPrice,
+      })),
+      totalPrice: cart.reduce((total, item) => total + item.totalPrice, 0),
+      address,
+      paymentReference,
     };
 
-    paypal.payment.create(payment, async (error, payment) => {
-      if (error) {
-        console.error(error);
-        return res.status(500).send('PayPal payment creation failed');
-      } else {
-        // Save payment id in order
-        newOrder.paymentId = payment.id;
-        await newOrder.save();
-        const approvalUrl = payment.links.find(link => link.rel === 'approval_url');
-        res.json({ approvalUrl: approvalUrl.href });
-      }
-    });
-  } catch (err) {
-    res.status(500).send('Server error');
+    // Save order to the database
+    const newOrder = new Order(orderDetails);
+    await newOrder.save();
+
+    res.status(201).json({ message: 'Order created successfully', order: newOrder });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
-// Success callback after PayPal payment
-exports.paymentSuccess = async (req, res) => {
-  const { paymentId, PayerID } = req.query;
-  
-  paypal.payment.execute(paymentId, { payer_id: PayerID }, async (error, payment) => {
-    if (error) {
-      console.error(error);
-      return res.status(500).send('Payment execution failed');
-    }
+exports.getOrdersByUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
 
-    // Update order status
-    const order = await Order.findOneAndUpdate({ paymentId }, { paymentStatus: 'Completed' }, { new: true });
-    
-    // Clear cart after successful payment
-    await Cart.findOneAndDelete({ user: req.user.id });
-    
-    res.json({ order });
-  });
-};
-
-// Cancel callback for PayPal payment
-exports.paymentCancel = (req, res) => {
-  res.status(400).json({ msg: 'Payment canceled' });
+    const orders = await Order.find({ 'user.id': userId });
+    res.status(200).json({ orders });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 };

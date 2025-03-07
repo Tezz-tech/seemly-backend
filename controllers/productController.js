@@ -2,13 +2,14 @@
 const Product = require('../models/Product');
 exports.createProduct = async (req, res) => {
   try {
-    const { name, description, price, stock, image } = req.body;
+    const { name, description, price, category, stock, image } = req.body;
 
     // Create product with image URL from Cloudinary
     const newProduct = await Product.create({
       name,
       description,
       price,
+      category,
       stock,
       image, // Save the image URL
     });
@@ -49,7 +50,7 @@ exports.getProductById = async (req, res) => {
 // Update a product by ID
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
-  const { name, description, price, stock, image } = req.body; // Now image is received from the frontend
+  const { name, description, price, category, stock, image } = req.body; // Now image is received from the frontend
 
   try {
     // Find the product by ID
@@ -63,6 +64,7 @@ exports.updateProduct = async (req, res) => {
     product.description = description || product.description;
     product.price = price || product.price;
     product.stock = stock || product.stock;
+    product.category = category || product.category;
     product.image = image || product.image; // Update image URL if provided
 
     // Save the updated product
